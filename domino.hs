@@ -45,7 +45,15 @@ module Domino where
     | domino == h = True
     | otherwise = playedP domino t
     
-    
+  possPlays :: Hand -> Board -> ([Domino], [Domino])
+  possPlays hand board = (a hand board L, a hand board R)
+
+
+  a :: Hand -> Board -> End -> [Domino]
+  a [] _ _ = []
+  a hand board end
+    | goesP (head hand) board end = [head hand] ++ a (tail hand) board end
+    | otherwise = a (tail hand) board end
   -- Tests
   
   domino15 :: Domino
@@ -123,5 +131,13 @@ module Domino where
   test22 = knockingP hand3 board2 -- Expected result: True
   test23 = knockingP hand3 board3 -- Expected result: True
 
+  -- Tests for playedP
+  test24 = playedP domino15 board1 -- Expected result: True
+  test25 = playedP domino25 board1 -- Expected result: True
+  test26 = playedP domino53 board1 -- Expected result: True
+  test27 = playedP domino44 board1 -- Expected result: False
+  test28 = playedP domino32 board1 -- Expected result: False
   
-  
+  -- Tests for possPlays
+  test29 = possPlays hand1 board1 -- Expected result: ([(1,5),(5,3)],[(1,5),(5,3)])
+  test30 = possPlays hand2 board1 -- Expected result: ([(6,1)],[])
