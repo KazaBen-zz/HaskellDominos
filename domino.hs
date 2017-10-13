@@ -1,14 +1,14 @@
 module Domino where
+  import Data.Maybe
+
   type Domino = (Int, Int)
   type Hand = [Domino]
   type Board = [Domino]
   
   data End = L | R -- Naming?
     deriving Eq
-    
-  data Maybe a = Nothing | Just a -- Is naming a ok?
-    deriving Show -- Is only Show enough or should i do Eq, Ord, Read, Show as in notes(not neccessary in this assignment)
-    
+        
+  
   swapDomino :: Domino -> Domino
   swapDomino dom = (snd dom, fst dom)
   
@@ -58,11 +58,11 @@ module Domino where
     |goesP (head hand) board end = [head hand] ++ a (tail hand) board end
     |otherwise = a (tail hand) board end
     
-  playDom :: Domino -> Board -> End -> Domino.Maybe Board -- Is Domino.Maybe ok?
+  playDom :: Domino -> Board -> End -> Maybe Board -- Is Domino.Maybe ok?
   playDom domino board end
-    |end == L && goesP domino board end = Domino.Just ((checkSwap domino board end) : board)
-    |end == R && goesP domino board end = Domino.Just (board ++ [(checkSwap domino board end)])
-    |otherwise = Domino.Nothing
+    |end == L && goesP domino board end = Just ((checkSwap domino board end) : board)
+    |end == R && goesP domino board end = Just (board ++ [(checkSwap domino board end)])
+    |otherwise = Nothing
     
   checkSwap :: Domino -> Board -> End -> Domino
   checkSwap domino board end
@@ -85,11 +85,21 @@ module Domino where
     |fst domino == snd domino = fst domino + snd domino
     |end == L = fst domino
     |end == R = snd domino
+    
+  
   
   scoreN :: Board -> Int -> ([Domino], [Domino])
-  scoreN board int
-    | scoreBoard (playDom domino board R) == int
-  
+  dominos :: [Domino]
+  dominos = [(0,1), (0,2), (0,3), (0,4), (0,5), (0,6), (1,1), (1,2), (1,3), (1,4), (1,5), (1,6), (2,2), (2,3), (2,4), (2,5), (2,6), (3,3), (3,4), (3,5), (3,6), (4,4), (4,5), (4,6), (5,5), (5,6), (6,6)]
+  scoreN board int = (c board dominos int L, c board dominos int R)
+    
+  c :: Board -> [Domino] -> Int -> End -> [Domino]
+  c _ [] _ _ = []
+  c board dominos int end
+    |playDom (head dominos) board end == Nothing = [] ++ c board (tail dominos) int end
+    |scoreBoard (fromJust (playDom (head dominos) board end)) == int = [head dominos] ++ c board (tail dominos) int end
+    |otherwise = [] ++ c board (tail dominos) int end
+    
   -- Tests (IS IT OK TO USE NOT REALISTIC BOARDS?)
   domino02 :: Domino
   domino02 = (0,2)
@@ -106,7 +116,6 @@ module Domino where
   domino51 :: Domino
   domino51 = (5,1)
   
-  domino25 :: Domino
   domino25 = (2,5)
   
   domino53 :: Domino
@@ -126,6 +135,18 @@ module Domino where
   
   domino45 :: Domino
   domino45 = (4,5)
+  
+  domino52 :: Domino
+  domino52 = (5,2)
+  
+  domino24 :: Domino
+  domino24 = (2,4)
+  
+  domino40 :: Domino
+  domino40 = (4,0)
+  
+  board0 :: Board
+  board0 = [domino52, domino24, domino44, domino40]
   
   board1 :: Board
   board1 = [domino15, domino25, domino53]
@@ -229,3 +250,7 @@ module Domino where
   test42 = scoreBoard board5 -- Expected result: 2
   test43 = scoreBoard board6 -- Expected result: 2
   test44 = scoreBoard board7 -- Expected result: 8
+  
+  -- Tests for scoreN
+  test45 = scoreN board1 3
+  test46 = scoreN board0 2
