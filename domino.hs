@@ -12,53 +12,36 @@ module Domino where
   swapDomino :: Domino -> Domino
   swapDomino dom = (snd dom, fst dom)
   
-  dominoHasNumber :: Domino->Int -> Bool
-  dominoHasNumber domino number
-    |fst domino == number = True 
-    |snd domino == number = True
-    |otherwise = False
-    
-  dominosHasSameDots :: Domino -> Domino -> Bool
-  dominosHasSameDots boardDomino handDomino
-    |otherwise = False
-  
   goesP :: Domino -> Board -> End -> Bool
+  goesP _ [] _ = True
   goesP handDomino board end
-    |null board = error "Board is empty"
     |end == L && (fst (head board) == fst handDomino || fst (head board) == snd handDomino) = True -- True if domino can be placed on LEFT end
     |end == R && (snd (last board) == fst handDomino || snd (last board) == snd handDomino) = True -- True if domino can be placed on RIGHT end
     |otherwise = False
-  
-  getEndDomino :: Board -> End -> Domino
-  getEndDomino board end
-    |end == R = last board
-    |end == L = head board   
       
   knockingP :: Hand -> Board -> Bool
-  knockingP [] _ = True -- I need this because eventually board tail is empty(when knocking) but is it ok?
+  knockingP [] _ = True 
   knockingP (h:t) board
-    |goesP h board R = False
-    |goesP h board L = False
+    |goesP h board R || goesP h board L = False
     |otherwise = knockingP t board
 
   playedP :: Domino -> Board -> Bool
   playedP _ [] = False
   playedP domino (h:t)
-    |domino == h = True
-    |swapDomino domino == h = True
+    |domino == h || swapDomino domino == h = True
     |otherwise = playedP domino t
     
   possPlays :: Hand -> Board -> ([Domino], [Domino])
-  possPlays hand board = (a hand board L, a hand board R)
+  possPlays hand board = (possPlaysEnd hand board L, possPlaysEnd hand board R)
 
 
-  a :: Hand -> Board -> End -> [Domino]
-  a [] _ _ = []
-  a hand board end
-    |goesP (head hand) board end = [head hand] ++ a (tail hand) board end
-    |otherwise = a (tail hand) board end
+  possPlaysEnd :: Hand -> Board -> End -> [Domino] -- Is it ok to have helper function?
+  possPlaysEnd [] _ _ = []
+  possPlaysEnd hand board end
+    |goesP (head hand) board end = [head hand] ++ possPlaysEnd (tail hand) board end
+    |otherwise = possPlaysEnd (tail hand) board end
     
-  playDom :: Domino -> Board -> End -> Maybe Board -- Is Domino.Maybe ok?
+  playDom :: Domino -> Board -> End -> Maybe Board -- Should I create my own Maybe?
   playDom domino board end
     |end == L && goesP domino board end = Just ((checkSwap domino board end) : board)
     |end == R && goesP domino board end = Just (board ++ [(checkSwap domino board end)])
@@ -72,10 +55,10 @@ module Domino where
     
   scoreBoard :: Board -> Int
   scoreBoard [] = 0
-  scoreBoard board = b 3 board + b 5 board
+  scoreBoard board = calculateScore 3 board + calculateScore 5 board
   
-  b :: Int -> Board -> Int
-  b num board
+  calculateScore :: Int -> Board -> Int
+  calculateScore num board
     |mod sum num == 0 = sum `div` num
     |otherwise = 0
     where sum =  addDoubleDominos (head board) L + addDoubleDominos (last board) R
@@ -85,8 +68,6 @@ module Domino where
     |fst domino == snd domino = fst domino + snd domino
     |end == L = fst domino
     |end == R = snd domino
-    
-  
   
   scoreN :: Board -> Int -> ([Domino], [Domino])
   dominos :: [Domino]
@@ -101,6 +82,9 @@ module Domino where
     |otherwise = [] ++ c board (tail dominos) int end
     
   -- Tests (IS IT OK TO USE NOT REALISTIC BOARDS?)
+  domino12 :: Domino
+  domino12 = (1,2)
+  
   domino02 :: Domino
   domino02 = (0,2)
   
@@ -116,6 +100,7 @@ module Domino where
   domino51 :: Domino
   domino51 = (5,1)
   
+  domino25 :: Domino
   domino25 = (2,5)
   
   domino53 :: Domino
@@ -149,25 +134,25 @@ module Domino where
   board0 = [domino52, domino24, domino44, domino40]
   
   board1 :: Board
-  board1 = [domino15, domino25, domino53]
+  board1 = [domino15, domino52, domino24]
   
   board2 :: Board
-  board2 = [domino00, domino61, domino32, domino25, domino15]
+  board2 = [domino00, domino02, domino23, domino32, domino24]
 
   board3 :: Board
-  board3 = [domino00, domino25, domino32]
+  board3 = [domino00, domino02, domino25]
   
   board4 :: Board
   board4 = []
   
   board5 :: Board
-  board5 = [domino15, domino45]
+  board5 = [domino15, domino52]
   
   board6 :: Board
   board6 = [domino15]
   
   board7 :: Board
-  board7 = [domino66, domino00, domino02, domino23]
+  board7 = [domino66, domino61, domino15, domino53]
   
   endL :: End
   endL = L
@@ -185,38 +170,31 @@ module Domino where
   hand3 = [domino44]
   
   hand4 :: Hand
-  hand4 = [domino15, domino00, domino61, domino32, domino44, domino51, domino53, domino02]
-
-  -- Tests for dominoHasNumber
-  test1 = dominoHasNumber domino15 1 -- Expected result: True
-  test2 = dominoHasNumber domino15 5 -- Expected result: True
-  test3 = dominoHasNumber domino15 7 -- Expected result: False
+  hand4 = [domino15, domino61, domino44, domino51, domino53]
   
-  -- Tests for dominosHasSameDots
-  test4 = dominosHasSameDots domino15 domino15 -- Expected result: True
-  test5 = dominosHasSameDots domino25 domino15 -- Expected result: True
-  test6 = dominosHasSameDots domino32 domino25 -- Expected result: True
-  test7 = dominosHasSameDots domino15 domino61 -- Expected result: True
-  test8 = dominosHasSameDots domino00 domino32 -- Expected result: False
+  hand5 :: Hand
+  hand5 = []
   
   -- Tests for goesP
-  test9 = goesP domino15 board1 endR -- Expected result: False
-  test10 = goesP domino15 board1 endL -- Expected result: True
-  test11 = goesP domino61 board1 endL -- Expected result: True
-  test12 = goesP domino32 board1 endR -- Expected result: True
-  test14 = goesP domino32 board2 endL -- Expected result: False
-  test15 = goesP domino00 board2 endR -- Expected result: False
-  
-  -- Tests for knockingP
-  test16 = knockingP hand1 board2 -- Expected result: False
-  test17 = knockingP hand1 board3 -- Expected result: True
-  test18 = knockingP hand2 board2 -- Expected result: False
-  test19 = knockingP hand2 board3 -- Expected result: False
-  test20 = knockingP hand2 board1 -- Expected result: False
-  test21 = knockingP hand3 board1 -- Expected result: True
-  test22 = knockingP hand3 board2 -- Expected result: True
-  test23 = knockingP hand3 board3 -- Expected result: True
+  test_goesP0 = goesP domino40 board1 endR -- Domino CAN be played RIGHT side. Expected result: True, Actual result: True
+  test_goesP1 = goesP domino12 board1 endL -- Domino CAN be played LEFT side. Expected result: True, Actual result: True
+  test_goesP2 = goesP domino12 board1 endR -- Domino CAN'T be played RIGHT side but can on LEFT. Expected result: False
+  test_goesP3 = goesP domino45 board1 endL -- Domino CAN'T be played LEFT side but can on RIGHT. Expected result: False
+  test_goesP4 = goesP domino32 board2 endL -- Domino CAN'T be played anywhere. Expected result: False, Actual result: False
+  test_goesP5 = goesP domino32 board2 endR -- Domino CAN'T be played anywhere. Expected result: False, Actual result: False
+  test_goesP6 = goesP domino40 board2 endR -- Domino CAN be played on BOTH sides. Expected result: True, Actual result: True
+  test_goesP7 = goesP domino40 board2 endL -- Domino CAN be played on BOTH sides. Expected result: True, Actual result: True
+  test_goesP8 = goesP domino02 board0 endR -- Domino CAN be played after swap. Expected result: True, Actual result: False
+  test_goesP9 = goesP domino12 board4 endR -- Domino CAN be played because board is empty. Expected: True, Actual result: True
+  test_goesP10 = goesP domino12 board4 endL -- Domino CAN be played because board is empty. Expected: True, Actual result: True
 
+  -- Tests for knockingP
+  test_knockingP0 = knockingP hand1 board0 -- Domino15 CAN be played on LEFT. Expected result: False, Actual result: False
+  test_knockingP1 = knockingP hand2 board0 -- Domino00 CAN be played on RIGHT. Expected result: False, Actual result: False 
+  test_knockingP2 = knockingP hand4 board2 -- Domino44 CAN be played on RIGHT. Expected result: False, Actual result: False 
+  test_knockingP3 = knockingP hand3 board0 -- NO dominoes can be played on board. Expected result: True, Actual: True
+  test_knockingP4 = knockingP hand5 board3 -- Empty hand. Expected result: True, Actual result: True
+  
   -- Tests for playedP
   test24 = playedP domino15 board1 -- Expected result: True
   test25 = playedP domino25 board1 -- Expected result: True
