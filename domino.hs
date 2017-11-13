@@ -1,234 +1,182 @@
 module Domino where
   import Data.Maybe
+  import Data.List
+  import System.Random
+  import MergeSort
+  import Debug.Trace
 
+  -- All possible dominoes
+  allDominos :: [Domino]
+  allDominos = [(0,1), (0,2), (0,3), (0,4), (0,5), (0,6), (1,1), (1,2), (1,3), (1,4), (1,5), (1,6), (2,2), (2,3), (2,4), (2,5), (2,6), (3,3), (3,4), (3,5), (3,6), (4,4), (4,5), (4,6), (5,5), (5,6), (6,6)]
+  
+  -- Data structures
   type Domino = (Int, Int)
   type Hand = [Domino]
   type Board = [Domino]
   
-  data End = L | R -- Naming?
-    deriving Eq
-        
-  
+  data End = L | R
+    deriving (Eq, Show)
+    
+  -- Swaps domino's values
   swapDomino :: Domino -> Domino
   swapDomino dom = (snd dom, fst dom)
   
   goesP :: Domino -> Board -> End -> Bool
-  goesP _ [] _ = True
+  goesP _ [] _ = True -- Empty board means any domino can be placed thus returning True
   goesP handDomino board end
+    |playedP handDomino board = False -- If domino is arleady played then domino can't be played
     |end == L && (fst (head board) == fst handDomino || fst (head board) == snd handDomino) = True -- True if domino can be placed on LEFT end
     |end == R && (snd (last board) == fst handDomino || snd (last board) == snd handDomino) = True -- True if domino can be placed on RIGHT end
-    |otherwise = False
+    |otherwise = False -- If domino can't be placed on left or right end then returning False
       
   knockingP :: Hand -> Board -> Bool
-  knockingP [] _ = True 
-  knockingP (h:t) board
-    |goesP h board R || goesP h board L = False
-    |otherwise = knockingP t board
+  knockingP [] _ = True -- Empty hand means can't place any domino
+  knockingP (h : t) board
+    |goesP h board R || goesP h board L = False -- If hand's first domino can be played on right or left then returning False
+    |otherwise = knockingP t board -- Otherwise recursive call on tail of the hand
 
   playedP :: Domino -> Board -> Bool
-  playedP _ [] = False
+  playedP _ [] = False -- If board is empty then no dominoes are played thus returning False
   playedP domino (h:t)
-    |domino == h || swapDomino domino == h = True
-    |otherwise = playedP domino t
+    |domino == h || swapDomino domino == h = True -- If domino or swapped domino is head of the board then True
+    |otherwise = playedP domino t -- Otherwise recursive call on the tail of the board
     
   possPlays :: Hand -> Board -> ([Domino], [Domino])
-  possPlays hand board = (possPlaysEnd hand board L, possPlaysEnd hand board R)
-
-
-  possPlaysEnd :: Hand -> Board -> End -> [Domino] -- Is it ok to have helper function?
-  possPlaysEnd [] _ _ = []
+  possPlays hand board = (possPlaysEnd hand board L, possPlaysEnd hand board R) -- Calling helper function on left and right
+  
+  -- Returns all dominoes which can be placed on the end from your hand
+  possPlaysEnd :: Hand -> Board -> End -> [Domino]
+  possPlaysEnd [] _ _ = [] -- If hand is empty nothing can be placed thus returning empty list
   possPlaysEnd hand board end
-    |goesP (head hand) board end = [head hand] ++ possPlaysEnd (tail hand) board end
-    |otherwise = possPlaysEnd (tail hand) board end
+    -- If head hand domino can go to board at given end then adding list of that domino to recursive call of same function with tail of the hand
+    |goesP (head hand) board end = [head hand] ++ possPlaysEnd (tail hand) board end 
+    |otherwise = possPlaysEnd (tail hand) board end -- Otherwise recursive call on the tail of the hand without adding the domino
     
-  playDom :: Domino -> Board -> End -> Maybe Board -- Should I create my own Maybe?
+  playDom :: Domino -> Board -> End -> Maybe Board
   playDom domino board end
-    |end == L && goesP domino board end = Just ((checkSwap domino board end) : board)
-    |end == R && goesP domino board end = Just (board ++ [(checkSwap domino board end)])
-    |otherwise = Nothing
+    |null board = Just [domino] -- If board is empty then returning board with that domino
+    |end == L && goesP domino board end = Just ((checkSwap domino board end) : board) -- If left end and domino can go to that end then adding domino(checks if domino needs to get values swapped) to the left of the board.
+    |end == R && goesP domino board end = Just (board ++ [(checkSwap domino board end)]) -- If right end and domino can go to that end then adding domino(checks if domino needs to get values swapped) to the right of the board
+    |otherwise = Nothing -- If domino cant go to any end then returning Nothing
     
+  -- Checks if domino's values needs to be swapped to be legally placed on the end of the board
   checkSwap :: Domino -> Board -> End -> Domino
   checkSwap domino board end
-    |end == L && snd domino == fst (head board) = domino
-    |end == R && fst domino == snd (last board) = domino
-    |otherwise = swapDomino domino
+    |end == L && snd domino == fst (head board) = domino -- Checks if domino can be legally placed without swaps to left
+    |end == R && fst domino == snd (last board) = domino -- Checks if domino can be legally placed without swaps to right
+    |otherwise = swapDomino domino -- If it can't be legally placed then swapping domino's values
     
   scoreBoard :: Board -> Int
-  scoreBoard [] = 0
-  scoreBoard board = calculateScore 3 board + calculateScore 5 board
+  scoreBoard [] = 0 -- Score of empty board is 0
+  scoreBoard board = calculateScore 3 board + calculateScore 5 board -- Adding calls helper function with 3 and 5 as parameters(3's and 5's game)
   
+  -- Calculates score given divider
   calculateScore :: Int -> Board -> Int
   calculateScore num board
-    |mod sum num == 0 = sum `div` num
-    |otherwise = 0
-    where sum =  addDoubleDominos (head board) L + addDoubleDominos (last board) R
+    |mod sum num == 0 = sum `div` num -- If sum modulus given number is 0 then returning sum divided by num
+    |otherwise = 0 -- Otherwise returning 0
+    where sum =  addDoubleDominos (head board) L + addDoubleDominos (last board) R -- sum is dominos sum of ends
 
+  -- Adds double dominoes values e.g. when domino is (5,5) then returns 10 if not double then returns the outermost value of the domino
   addDoubleDominos :: Domino -> End -> Int
   addDoubleDominos domino end
-    |fst domino == snd domino = fst domino + snd domino
-    |end == L = fst domino
-    |end == R = snd domino
+    |fst domino == snd domino = fst domino + snd domino -- If both values are the same then returning sum of them
+    |end == L = fst domino -- If end is left then returning first value of domino(leftmost)
+    |end == R = snd domino -- If end is right then returning second value of domino(rightmost)
+  
   
   scoreN :: Board -> Int -> ([Domino], [Domino])
-  dominos :: [Domino]
-  dominos = [(0,1), (0,2), (0,3), (0,4), (0,5), (0,6), (1,1), (1,2), (1,3), (1,4), (1,5), (1,6), (2,2), (2,3), (2,4), (2,5), (2,6), (3,3), (3,4), (3,5), (3,6), (4,4), (4,5), (4,6), (5,5), (5,6), (6,6)]
-  scoreN board int = (c board dominos int L, c board dominos int R)
+  scoreN board int = (scoreNEnd board allDominos int L, scoreNEnd board allDominos int R) -- Calling helper function on both ends
     
-  c :: Board -> [Domino] -> Int -> End -> [Domino]
-  c _ [] _ _ = []
-  c board dominos int end
-    |playDom (head dominos) board end == Nothing = [] ++ c board (tail dominos) int end
-    |scoreBoard (fromJust (playDom (head dominos) board end)) == int = [head dominos] ++ c board (tail dominos) int end
-    |otherwise = [] ++ c board (tail dominos) int end
+  -- Returns all dominoes which can be played at the given end to get required score
+  scoreNEnd :: Board -> [Domino] -> Int -> End -> [Domino]
+  scoreNEnd _ [] _ _ = [] -- If there are no dominoes left to try then returning empty set
+  scoreNEnd board dominos int end
+    |playDom (head dominos) board end == Nothing = [] ++ scoreNEnd board (tail dominos) int end -- If domino can't go to any end then returning empty list plus recursive call on the tail of dominos
+    |scoreBoard (fromJust (playDom (head dominos) board end)) == int = [head dominos] ++ scoreNEnd board (tail dominos) int end -- If score required can be get by playing domino at given end then adding that domino to recursive call on the tail of dominos
+    |otherwise = [] ++ scoreNEnd board (tail dominos) int end -- Otherwise returning empty set plus recursivve call on tail of dominos
+  
+
+  -- Assignment 2
+  
+  type DomsPlayer = Hand -> Board -> Maybe (Domino,End)
     
-  -- Tests (IS IT OK TO USE NOT REALISTIC BOARDS?)
-  domino12 :: Domino
-  domino12 = (1,2)
-  
-  domino02 :: Domino
-  domino02 = (0,2)
-  
-  domino23 :: Domino
-  domino23 = (2,3)
-  
-  domino66 :: Domino
-  domino66 = (6,6)
-  
-  domino15 :: Domino
-  domino15 = (1,5)
-  
-  domino51 :: Domino
-  domino51 = (5,1)
-  
-  domino25 :: Domino
-  domino25 = (2,5)
-  
-  domino53 :: Domino
-  domino53 = (5,3)
+  simplePlayer :: DomsPlayer
+  simplePlayer [] _ = Nothing
+  simplePlayer (h:t) board 
+    | playDom h board L /= Nothing = Just (h, L)
+    | playDom h board R /= Nothing = Just (h, R)
+    | otherwise = simplePlayer t board
 
-  domino32 :: Domino
-  domino32 = (3,2)
+  hsdPlayer :: DomsPlayer
+  hsdPlayer [] _ = Nothing
+  hsdPlayer hand@(h:t) board 
+    | playDom h board R /= Nothing && scoreBoard(fromJust(playDom h board R)) == maxScore = Just (h, R)
+    | playDom h board L /= Nothing && scoreBoard(fromJust(playDom h board L)) == maxScore = Just (h, L)
+    | otherwise = hsdPlayer t board
+    where maxScore = getMaxScore (createScores hand board L ) (createScores hand board R)
+  
+  createScores :: Hand -> Board -> End -> [Int]
+  createScores [] _ _ = []
+  createScores hand@(h:t) board end
+    | playDom h board end == Nothing = [-1] ++  createScores t board end
+    | otherwise = [scoreBoard(fromJust(playDom h board end))] ++ createScores t board end
+  
+  getMaxScore :: [Int] -> [Int] -> Int
+  getMaxScore l1 l2 = maximum (l1 ++ l2)
+  
+  -- Shuffles all dominos
+  shuffleDoms :: Int -> Hand
+  shuffleDoms int = map fst (mergesort (\(_,n1) (_,n2) -> n1<n2)(zip allDominos (take 28 (randoms(mkStdGen int) :: [Int]))))
+  
+  playDomsRound :: DomsPlayer -> DomsPlayer -> Int -> (Int, Int)
+  playDomsRound p1 p2 seed = trace("Hand1: " ++ show hand1 ++ " Hand2: " ++ show hand2)(playARound p1 p2 [] hand1 hand2, playARound p2 p1 (makeAMove p1 [] hand1) hand2 hand1)
+    where hand1 = makeAHand 1 seed
+          hand2 = makeAHand 2 seed
+        
+  -- Plays a round of dominos and returns the score scored by first player
+  playARound :: DomsPlayer -> DomsPlayer -> Board -> Hand -> Hand -> Int
+  playARound _ _ _ [] _ = 0
+  playARound p1 p2 boardd h1 h2
+    | p1 h1 boardd == Nothing && p2 h2 boardd == Nothing = trace ("Both") 0
+    | p1 h1 boardd == Nothing = trace ("Player 1 cant put anything.Board :" ++ show boardd) 0 + snd (makeAMoveAndCalcScore p1 boardd h1) + playARound p1 p2 (makeAMove p2 (makeAMove p1 boardd h1) h2) h1 h2
+    | otherwise = trace ("Putting " ++ show (fromJust (p1 h1 boardd))++" Board: " ++ show (makeAMove p1 boardd h1)) snd (makeAMoveAndCalcScore p1 boardd h1) + playARound p1 p2 (makeAMove p2 (makeAMove p1 boardd h1) h2) h1 h2
+    
+  --Makes a move and returns a board
+  makeAMove :: DomsPlayer -> Board -> Hand -> Board
+  makeAMove player board hand 
+    | player hand board == Nothing = board
+    | otherwise = fromJust newBoard
+    where newBoard = playDom (fst (fromJust (player hand board))) board (snd (fromJust (player hand board)))
+  
+  makeAMoveAndCalcScore :: DomsPlayer -> Board -> Hand -> (Board, Int)
+  makeAMoveAndCalcScore player board hand = (newBoard, scoreBoard newBoard)
+    where newBoard = makeAMove player board hand
+    
+  -- Makes a hand for player 1 or player 2.
+  makeAHand :: Int -> Int -> Hand
+  makeAHand num seed
+    | num == 1 = take 7 doms
+    | num == 2 = take 7 (reverse doms)
+    where doms = shuffleDoms seed
+  
+  -- If a person doesnt put any dominos will he get points for the board???
+  -- Scoreboard (3,3) gives result 4 rather than 2 :(
+  -- Can i use Maybe at DomsPlayer???
+  
+  simplePlayer_Test0 = simplePlayer [(0,3), (2,4), (3,4), (6,2)] [(3,5), (5,4)] -- Result: Just ((0,3),L). Testing left end.
+  simplePlayer_Test1 = simplePlayer [(0,5), (2,4), (3,4), (6,2)] [(3,5), (5,4)] -- Result: Just ((2,4),R). Testing right end.
+  simplePlayer_Test2 = simplePlayer [(0,5), (2,4), (3,4), (6,2)] [] -- Result: Just ((0,5),L). Testing empty board.
+  simplePlayer_Test3 = simplePlayer [] [(3,5), (5,4)] -- Result: Nothing. Testing empty hand.
+  simplePlayer_Test4 = simplePlayer [] [] -- Result: Nothing. Testing empty hand, empty board.
+  simplePlayer_Test5 = simplePlayer [(0,5), (0,6)] [(0,0)] -- Result: Just ((0,5),L). Testing if first domino will be placed(both can be).
+  
+  hsdPlayer_Test0 = hsdPlayer [(0,3), (2,4), (3,4), (6,2)] [(3,5), (5,4)] -- Result: Just ((3,4),R)).Testing RIGHT end(Scores 2 points) 
+  hsdPlayer_Test1 = hsdPlayer [(0,3), (3,1)] [(3,6), (6,4)] -- Result: Just ((3,1),L). Testing LEFT end.
+  hsdPlayer_Test2 = hsdPlayer [(0,5), (2,4), (6,6), (6,2)] [] -- Result: Just ((6,6),R). Testing empty board.
+  hsdPlayer_Test3 = hsdPlayer [] [(3,5), (5,4)] -- Result: Nothing. Testing empty hand.
+  hsdPlayer_Test4 = hsdPlayer [] [] -- Result: Nothing. Testing empty hand, empty board.
+  hsdPlayer_Test5 = hsdPlayer [(0,5), (0,6)] [(0,0)] -- Result: Just ((0,6),R). Testing if most scored domino will be placed(both can be).
+  
+  
 
-  domino00 :: Domino
-  domino00 = (0,0)
-  
-  domino61 :: Domino
-  domino61 = (6,1)
-
-  domino44 :: Domino
-  domino44 = (4,4)
-  
-  domino45 :: Domino
-  domino45 = (4,5)
-  
-  domino52 :: Domino
-  domino52 = (5,2)
-  
-  domino24 :: Domino
-  domino24 = (2,4)
-  
-  domino40 :: Domino
-  domino40 = (4,0)
-  
-  board0 :: Board
-  board0 = [domino52, domino24, domino44, domino40]
-  
-  board1 :: Board
-  board1 = [domino15, domino52, domino24]
-  
-  board2 :: Board
-  board2 = [domino00, domino02, domino23, domino32, domino24]
-
-  board3 :: Board
-  board3 = [domino00, domino02, domino25]
-  
-  board4 :: Board
-  board4 = []
-  
-  board5 :: Board
-  board5 = [domino15, domino52]
-  
-  board6 :: Board
-  board6 = [domino15]
-  
-  board7 :: Board
-  board7 = [domino66, domino61, domino15, domino53]
-  
-  endL :: End
-  endL = L
-  
-  endR :: End
-  endR = R
-  
-  hand1 :: Hand
-  hand1 = [domino15, domino53]
-  
-  hand2 :: Hand
-  hand2 = [domino00, domino61]
-  
-  hand3 :: Hand
-  hand3 = [domino44]
-  
-  hand4 :: Hand
-  hand4 = [domino15, domino61, domino44, domino51, domino53]
-  
-  hand5 :: Hand
-  hand5 = []
-  
-  -- Tests for goesP
-  test_goesP0 = goesP domino40 board1 endR -- Domino CAN be played RIGHT side. Expected result: True, Actual result: True
-  test_goesP1 = goesP domino12 board1 endL -- Domino CAN be played LEFT side. Expected result: True, Actual result: True
-  test_goesP2 = goesP domino12 board1 endR -- Domino CAN'T be played RIGHT side but can on LEFT. Expected result: False
-  test_goesP3 = goesP domino45 board1 endL -- Domino CAN'T be played LEFT side but can on RIGHT. Expected result: False
-  test_goesP4 = goesP domino32 board2 endL -- Domino CAN'T be played anywhere. Expected result: False, Actual result: False
-  test_goesP5 = goesP domino32 board2 endR -- Domino CAN'T be played anywhere. Expected result: False, Actual result: False
-  test_goesP6 = goesP domino40 board2 endR -- Domino CAN be played on BOTH sides. Expected result: True, Actual result: True
-  test_goesP7 = goesP domino40 board2 endL -- Domino CAN be played on BOTH sides. Expected result: True, Actual result: True
-  test_goesP8 = goesP domino02 board0 endR -- Domino CAN be played after swap. Expected result: True, Actual result: False
-  test_goesP9 = goesP domino12 board4 endR -- Domino CAN be played because board is empty. Expected: True, Actual result: True
-  test_goesP10 = goesP domino12 board4 endL -- Domino CAN be played because board is empty. Expected: True, Actual result: True
-
-  -- Tests for knockingP
-  test_knockingP0 = knockingP hand1 board0 -- Domino15 CAN be played on LEFT. Expected result: False, Actual result: False
-  test_knockingP1 = knockingP hand2 board0 -- Domino00 CAN be played on RIGHT. Expected result: False, Actual result: False 
-  test_knockingP2 = knockingP hand4 board2 -- Domino44 CAN be played on RIGHT. Expected result: False, Actual result: False 
-  test_knockingP3 = knockingP hand3 board0 -- NO dominoes can be played on board. Expected result: True, Actual: True
-  test_knockingP4 = knockingP hand5 board3 -- Empty hand. Expected result: True, Actual result: True
-  
-  -- Tests for playedP
-  test24 = playedP domino15 board1 -- Expected result: True
-  test25 = playedP domino25 board1 -- Expected result: True
-  test26 = playedP domino53 board1 -- Expected result: True
-  test27 = playedP domino44 board1 -- Expected result: False
-  test28 = playedP domino32 board1 -- Expected result: False
-  test28a = playedP domino51 board1 -- Expected result: True
-  
-  
-  -- Tests for possPlays
-  test29 = possPlays hand1 board1 -- Expected result: ([(1,5)],[(5,3)])
-  test30 = possPlays hand2 board1 -- Expected result: ([(6,1)],[])
-  test30a = possPlays hand2 board2 -- Expected result: ([(0,0)],[])
-  test30b = possPlays hand4 board2 -- Expected result: ([(0,0),(0,2)],[(1,5),(5,1),(5,3)])
-  
-  -- Tests for playDom
-  test31 = playDom domino15 board1 L -- Expected result: Just [(5,1),(1,5),(2,5),(5,3)]
-  test32 = playDom domino15 board1 R -- Expected result: Nothing
-  test33 = playDom domino00 board1 L -- Expected result: Nothing
-  test34 = playDom domino44 board2 L -- Expected result: Nothing
-  test35 = playDom domino44 board2 R -- Expected result: Nothing
-  test36 = playDom domino32 board1 R -- Expected result: Just [(1,5),(2,5),(5,3),(3,2)]
-  test37 = playDom domino32 board1 L -- Expected result: Nothing
-  test37a = playDom domino23 board1 R -- Expected result: Just [(1,5),(2,5),(5,3),(3,2)]
-  
-  -- Tests for scoreBoard
-  test38 = scoreBoard board1 -- Expected result: 0
-  test39 = scoreBoard board2 -- Expected result: 1
-  test40 = scoreBoard board3 -- Expected result: 0
-  test41 = scoreBoard board4 -- Expected result: 0
-  test42 = scoreBoard board5 -- Expected result: 2
-  test43 = scoreBoard board6 -- Expected result: 2
-  test44 = scoreBoard board7 -- Expected result: 8
-  
-  -- Tests for scoreN
-  test45 = scoreN board1 3
-  test46 = scoreN board0 2
